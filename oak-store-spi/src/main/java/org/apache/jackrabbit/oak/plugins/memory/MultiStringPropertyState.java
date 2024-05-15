@@ -31,14 +31,11 @@ import java.io.OutputStream;
 import java.nio.charset.StandardCharsets;
 import java.util.*;
 
-import static org.apache.jackrabbit.guava.common.base.Preconditions.checkState;
-
 public class MultiStringPropertyState extends MultiPropertyState<String> {
     public MultiStringPropertyState(String name, Iterable<String> values) {
         super(name, values);
     }
 
-    //private final String value;
     private static byte[] compressedValue;
     private static Compression compression = Compression.GZIP;
 
@@ -56,17 +53,11 @@ public class MultiStringPropertyState extends MultiPropertyState<String> {
         int size = result.getBytes().length;
         if (size > 0) {//todo: introduce a threshold
             compressedValue = compress(result.getBytes());
-            System.out.println("compressedValue = " + compressedValue.length);
             compressedValues.add(new String(compressedValue));
-            //this.value = null;
+            return new MultiStringPropertyState(name, compressedValues);
         } else {
-            //this.value = value;
-            compressedValues.add(result);
+            return new MultiStringPropertyState(name, values);
         }
-
-        return new MultiStringPropertyState(name, compressedValues);
-
-        //return new MultiStringPropertyState(name, values);
     }
 
     private static byte[] compress(byte[] value) {
@@ -83,7 +74,7 @@ public class MultiStringPropertyState extends MultiPropertyState<String> {
 
     @Override
     public Converter getConverter(String value) {
-        return Conversions.convert(value != null ? value : decompress(compressedValue));
+        return Conversions.convert(decompress(compressedValue));
     }
 
     @Override
@@ -99,23 +90,13 @@ public class MultiStringPropertyState extends MultiPropertyState<String> {
         }
     }
 
-    //@Override
-    public String getValue(String value) {
-        return decompress(value.getBytes(StandardCharsets.UTF_8));
+    @Override
+    public <S> S getValue(Type<S> type) {
+        if (type == getType()) {
+            return (S) decompress(values.get(0).getBytes(StandardCharsets.UTF_8));
+        } else {
+            return super.getValue(type);
+        }
     }
 
-
-
-
-    /*static byte[] compress(byte[] value) {
-        try {
-            ByteArrayOutputStream out = new ByteArrayOutputStream();
-            OutputStream compressionOutputStream = new LZ4FrameOutputStream(out);
-            compressionOutputStream.write(value);
-            compressionOutputStream.close();
-            return out.toByteArray();
-        } catch (IOException e) {
-            throw new RuntimeException("Failed to compress data", e);
-        }
-    }*/
 }
