@@ -28,16 +28,31 @@ import java.io.ByteArrayInputStream;
 import java.io.ByteArrayOutputStream;
 import java.io.IOException;
 import java.io.OutputStream;
-import java.nio.charset.StandardCharsets;
 import java.util.*;
 
 public class MultiStringPropertyState extends MultiPropertyState<String> {
+
+    //store compress concatenated values
+    private byte[] compressedValues;
+    private static Compression compression = Compression.GZIP;
+
     public MultiStringPropertyState(String name, Iterable<String> values) {
-        super(name, values);
+        super(name, Collections.EMPTY_LIST);
+
+        String result = String.join(", ", values);
+
+        int size = result.getBytes().length;
+        if (size > 0) {//todo: introduce a threshold
+            compressedValues = compress(result.getBytes());
+        } else {
+            //this.values = (List<String>) values;
+        }
     }
 
-    private static byte[] compressedValue;
-    private static Compression compression = Compression.GZIP;
+    @Override
+    public List<String> getValues() {
+        return decompress(compressedValues);
+    }
 
     /**
      * Create a multi valued {@code PropertyState} from a list of strings.
@@ -47,20 +62,11 @@ public class MultiStringPropertyState extends MultiPropertyState<String> {
      * @return The new property state of type {@link Type#STRINGS}
      */
     public static PropertyState stringProperty(String name, Iterable<String> values) {
-        List<String> compressedValues = new ArrayList<>();
-        String result = String.join("", values);
 
-        int size = result.getBytes().length;
-        if (size > 0) {//todo: introduce a threshold
-            compressedValue = compress(result.getBytes());
-            compressedValues.add(new String(compressedValue));
-            return new MultiStringPropertyState(name, compressedValues);
-        } else {
-            return new MultiStringPropertyState(name, values);
-        }
+        return new MultiStringPropertyState(name, values);
     }
 
-    private static byte[] compress(byte[] value) {
+    private byte[] compress(byte[] value) {
         try {
             ByteArrayOutputStream out = new ByteArrayOutputStream();
             OutputStream compressionOutputStream = compression.getOutputStream(out);
@@ -74,7 +80,7 @@ public class MultiStringPropertyState extends MultiPropertyState<String> {
 
     @Override
     public Converter getConverter(String value) {
-        return Conversions.convert(decompress(compressedValue));
+        return Conversions.convert(String.valueOf(decompress(value.getBytes())));
     }
 
     @Override
@@ -82,20 +88,11 @@ public class MultiStringPropertyState extends MultiPropertyState<String> {
         return Type.STRINGS;
     }
 
-    private String decompress(byte[] value) {
+    private List<String> decompress(byte[] value) {
         try {
-            return new String(compression.getInputStream(new ByteArrayInputStream(value)).readAllBytes());
+            return Collections.singletonList(new String(compression.getInputStream(new ByteArrayInputStream(value)).readAllBytes()));
         } catch (IOException e) {
             throw new RuntimeException("Failed to decompress data", e);
-        }
-    }
-
-    @Override
-    public <S> S getValue(Type<S> type) {
-        if (type == getType()) {
-            return (S) decompress(values.get(0).getBytes(StandardCharsets.UTF_8));
-        } else {
-            return super.getValue(type);
         }
     }
 

@@ -62,7 +62,7 @@ abstract class MultiPropertyState<T> extends EmptyPropertyState {
     private <S> S  convertTo(Type<S> type) {
         switch (type.tag()) {
             case PropertyType.STRING:
-                return (S) Iterables.transform(values, new Function<T, String>() {
+                return (S) Iterables.transform(getValues(), new Function<T, String>() {
                     @Override
                     public String apply(T value) {
                         return getConverter(value).toString();
@@ -160,7 +160,7 @@ abstract class MultiPropertyState<T> extends EmptyPropertyState {
     public <S> S getValue(Type<S> type) {
         checkState(type.isArray(), "Type must be an array type");
         if (getType() == type) {
-            return (S) values;
+            return (S) getValues();
         }
         else {
             return convertTo(type);
@@ -212,6 +212,10 @@ abstract class MultiPropertyState<T> extends EmptyPropertyState {
     @Override
     public long size(int index) {
         return convertTo(Type.STRING, index).length();
+    }
+
+    public List<T> getValues() {
+        return values;
     }
 
 }
